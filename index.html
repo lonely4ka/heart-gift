@@ -25,7 +25,6 @@
       height: 100%;
       display: block;
     }
-    /* Красивая подсказка на старте */
     .fullscreen-hint {
       position: absolute;
       top: 30px;
@@ -40,12 +39,17 @@
   </style>
 </head>
 <body>
-  <div class="fullscreen-hint" id="hint">Кликни в любом месте, чтобы открыть во весь экран (Выход — ESC)</div>
+  <!-- Подсказка теперь сообщает и про звук -->
+  <div class="fullscreen-hint" id="hint">Кликни в любом месте, чтобы включить музыку и полный экран (Выход — ESC)</div>
   <canvas id="heart"></canvas>
+
+  <!-- Тег аудио, который ссылается на ваш будущий файл music.mp3 -->
+  <audio id="bg-music" src="music.mp3" loop></audio>
 
   <script>
     const canvas = document.getElementById("heart");
     const ctx = canvas.getContext("2d");
+    const audio = document.getElementById("bg-music");
 
     const phrases = [
       "i love you", "я люблю тебя", "te quiero", "je t'aime", 
@@ -61,16 +65,11 @@
     let scaleBase = 0;
 
     function resize() {
-      // Холст теперь занимает физически весь экран без образования черных полей
       canvas.width = window.innerWidth * devicePixelRatio;
       canvas.height = window.innerHeight * devicePixelRatio;
-
       ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-
-      // Рассчитываем безопасный масштаб: сердце гарантированно не вылезет за экран
       const minDim = Math.min(window.innerWidth, window.innerHeight);
-      scaleBase = minDim * 0.31; // Коэффициент уменьшен с 0.34 до 0.31 для запаса по краям
-
+      scaleBase = minDim * 0.31;
       createHeart();
     }
 
@@ -85,7 +84,6 @@
 
     function createHeart() {
       points = [];
-      // Шаг сетки оптимизирован, чтобы на полный экран точек было достаточно и анимация не тормозила
       for (let y = 1.3; y >= -1.25; y -= 0.045) {
         for (let x = -1.35; x <= 1.35; x += 0.045) {
           if (insideHeart(x, y)) {
@@ -115,14 +113,13 @@
       const progress = Math.min(elapsed / APPEAR_TIME, 1);
 
       const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2 + (scaleBase * 0.12); // Смещение центра чуть вниз для компенсации "ушек" сердца
+      const cy = window.innerHeight / 2 + (scaleBase * 0.12);
 
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       const pulse = progress >= 1 ? 1 + Math.sin(elapsed * 2.5) * 0.025 : 1;
       const currentScale = scaleBase * pulse;
 
-      // Мягкий неоновый фон по центру экрана
       const glow = ctx.createRadialGradient(cx, cy, 5, cx, cy, Math.max(window.innerWidth, window.innerHeight) * 0.4);
       glow.addColorStop(0, "rgba(255,20,75,0.15)");
       glow.addColorStop(1, "rgba(255,0,50,0)");
@@ -139,7 +136,6 @@
         const localTime = elapsed - (i / points.length) * APPEAR_TIME;
         const move = ease(Math.max(0, Math.min(1, localTime / MOVE_TIME)));
 
-        // Движение рассчитывается относительно динамического центра экрана
         const x = cx + (p.startX * (1 - move) + p.x * move) * currentScale;
         const y = cy - (p.startY * (1 - move) + p.y * move) * currentScale;
 
@@ -155,14 +151,12 @@
         ctx.fillText(p.text, x, y);
       }
 
-      // Проявление финального текста ровно по центру сердца
       if (progress >= 1) {
         ctx.globalAlpha = Math.min(1, (elapsed - APPEAR_TIME) * 1.5);
         ctx.shadowBlur = 20;
         ctx.shadowColor = "#ff174f";
         ctx.fillStyle = "#fff0f5";
         
-        // Размер текста адаптируется под высоту экрана
         const fontSize = Math.max(24, window.innerHeight * 0.065);
         ctx.font = `bold ${fontSize}px Arial`;
         ctx.fillText(centerText, cx, cy);
@@ -174,8 +168,14 @@
       requestAnimationFrame(draw);
     }
 
-    // Автоматический запрос на Fullscreen режим браузера по клику
+    // Клик запускает и Fullscreen, и воспроизведение музыки
     document.body.addEventListener('click', function() {
+      // Запуск трека
+      if (audio.paused) {
+        audio.play().catch(err => console.log("Ошибка воспроизведения звука: " + err.message));
+      }
+
+      // Переход в полный экран
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().then(() => {
           document.getElementById('hint').style.opacity = '0';
@@ -185,10 +185,11 @@
       }
     });
 
-    // Если пользователь закрыл Fullscreen кнопкой ESC, возвращаем подсказку
     document.addEventListener('fullscreenchange', function() {
       if (!document.fullscreenElement) {
         document.getElementById('hint').style.opacity = '1';
+        // Опционально: можно поставить музыку на паузу при выходе из полного экрана
+        // audio.pause();
       }
     });
 
